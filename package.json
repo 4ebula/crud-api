@@ -1,0 +1,26 @@
+{
+  "name": "crud-api",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "exports": "./dist/index.js",
+  "scripts": {
+    "start:dev": "nodemon",
+    "start:prod": "tsc && node ./dist/index.js"
+  },
+  "keywords": [],
+  "author": "4ebula",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.3.2",
+    "@typescript-eslint/eslint-plugin": "^5.60.1",
+    "@typescript-eslint/parser": "^5.60.1",
+    "dotenv": "^16.3.1",
+    "eslint": "^8.43.0",
+    "nodemon": "^2.0.22",
+    "ts-loader": "^9.4.4",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.1.6"
+  }
+}
