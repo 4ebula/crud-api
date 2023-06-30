@@ -1,5 +1,6 @@
-import * as dotenv from 'dotenv'
-dotenv.config()
+import * as dotenv from 'dotenv';
+import Server from './server';
 
-console.log('Hello world!');
-console.log(process.env.PORT);
+dotenv.config();
+
+new Server(process.env.PORT).create().listen();
