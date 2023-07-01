@@ -1,9 +1,10 @@
 /* eslint-disable no-console */
 import http from 'node:http';
 import { DB } from './db';
-import { Readable, pipeline } from 'node:stream';
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import { REG_ENDPOINT_BASE, REG_USER_REPLACE, REG_UUID } from './utils';
-import { StatusCodes } from './models';
+import { StatusCodes, UserInfo } from './models';
 import { UUID } from 'node:crypto';
 
 export default class Server {
@@ -41,6 +42,7 @@ export default class Server {
         this.handlePostRequest(req, res);
         break;
       case 'PUT':
+        this.handlePutRequest(id, req, res);
         break;
       case 'DELETE':
         break;
@@ -51,12 +53,19 @@ export default class Server {
 
   private handleGetRequest(id: string, res: http.ServerResponse): void {
     if (!id) {
-      this.sendUsers(res);
+      const usersList = this.db.getUserList();
+      this.sendWithContent(res, usersList);
       return;
     }
 
     if (REG_UUID.test(id)) {
-      this.sendUser(id, res);
+      const item = this.db.getUserById(id as UUID);
+      if (!item) {
+        this.sendError(res, StatusCodes.NotFound, `Item with id ${id} not found`);
+        return;
+      }
+
+      this.sendWithContent(res, item);
     } else {
       this.sendError(res, StatusCodes.InvalidRequest, 'Invalid id');
     }
@@ -64,11 +73,7 @@ export default class Server {
 
   private handlePostRequest(req: http.IncomingMessage, res: http.ServerResponse): void {
     if (req.headers['content-type'] !== 'application/json') {
-      this.sendError(
-        res,
-        StatusCodes.InvalidRequest,
-        'Wrong type of data. Use JSON'
-      );
+      this.sendError(res, StatusCodes.InvalidRequest, 'Wrong type of data. Use JSON');
       return;
     }
 
@@ -76,33 +81,44 @@ export default class Server {
     req.on('data', chunk => (body += chunk));
 
     req.on('end', () => {
-      const user = JSON.parse(body.toString());
       try {
-        this.db.addUser(user);
-        this.sendOK(res, 'Succesfully added');
+        const user = JSON.parse(body.toString());
+        const newUser = this.db.addUser(user);
+        this.sendWithContent(res, newUser);
       } catch (err) {
         this.sendError(res, StatusCodes.InvalidRequest, err.message);
       }
     });
   }
 
-  private sendUsers(res: http.ServerResponse): void {
-    const usersList = JSON.stringify(this.db.getUserList());
-    res.setHeader('Content-Type', 'application/json');
-    res.statusCode = StatusCodes.OK;
-    pipeline(Readable.from(usersList), res, err => console.log(err));
-  }
-
-  private sendUser(uuid: string, res: http.ServerResponse): void {
-    const item = this.db.getUserById(uuid as UUID);
-    if (!item) {
-      this.sendError(res, StatusCodes.NotFound, `Item with id ${uuid} not found`);
+  private handlePutRequest(
+    id: string,
+    req: http.IncomingMessage,
+    res: http.ServerResponse
+  ): void {
+    if (!REG_UUID.test(id)) {
+      this.sendError(res, StatusCodes.InvalidRequest, 'Invalid id');
       return;
     }
 
-    res.setHeader('Content-Type', 'application/json');
-    res.statusCode = StatusCodes.OK;
-    pipeline(Readable.from(JSON.stringify(item)), res, err => console.log(err));
+    const item = this.db.getUserById(id as UUID);
+    if (!item) {
+      this.sendError(res, StatusCodes.NotFound, `Item with id ${id} not found`);
+      return;
+    }
+
+    let body = Buffer.from('');
+    req.on('data', chunk => (body += chunk));
+
+    req.on('end', async () => {
+      const user = JSON.parse(body.toString());
+      try {
+        const updatedUser = this.db.updateUser(id as UUID, user);
+        this.sendWithContent(res, updatedUser);
+      } catch (err) {
+        this.sendError(res, StatusCodes.InvalidRequest, err.message);
+      }
+    });
   }
 
   private sendError(res: http.ServerResponse, code: StatusCodes, message: string): void {
@@ -111,8 +127,22 @@ export default class Server {
     res.end();
   }
 
-  private sendOK(res: http.ServerResponse, message: string): void {
+  private sendOK(res: http.ServerResponse): void {
     res.statusCode = StatusCodes.OK;
-    res.end(message);
+    res.end('OK');
+  }
+
+  private async sendWithContent(
+    res: http.ServerResponse,
+    content: UserInfo | UserInfo[]
+  ): Promise<void> {
+    try {
+      res.setHeader('Content-Type', 'application/json');
+      res.statusCode = StatusCodes.OK;
+      await pipeline(Readable.from(JSON.stringify(content)), res);
+    } catch {
+      res.statusCode = StatusCodes.InternalError;
+      res.end('Internal server error occured. Please try again later');
+    }
   }
 }

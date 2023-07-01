@@ -1,17 +1,24 @@
 import { randomUUID } from 'crypto';
-import { UserInfo } from '../models/user.model';
+import { BaseUserInfo, UserInfo } from '../models/user.model';
 
 export class User {
   private id = randomUUID();
 
-  constructor(private username: string, private age: number, private hobbies: string[]) {}
+  constructor(private userInfo: BaseUserInfo) {}
 
   getUserInfo(): UserInfo {
     return {
       id: this.id,
-      username: this.username,
-      age: this.age,
-      hobbies: this.hobbies,
+      ...this.userInfo
     };
+  }
+
+  static createFromArgs(username: string, age: number, hobbies: string[]): UserInfo {
+    return {
+      id: randomUUID(),
+      username,
+      age,
+      hobbies,
+    }
   }
 }

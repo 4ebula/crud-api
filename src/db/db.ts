@@ -1,5 +1,5 @@
 import { UUID } from 'crypto';
-import { UserInfo } from '../models/user.model';
+import { BaseUserInfo, UserInfo } from '../models/user.model';
 import { User } from './user';
 import { EmptyValueError, MissingPropertyError, WrongTypeError } from '../utils';
 
@@ -7,9 +7,9 @@ export class DB {
   static instance: DB;
   // private list: UserInfo[] = [];
   private list: UserInfo[] = [
-    new User('John Dow', 15, ['sleeping']).getUserInfo(),
-    new User('Jane Doe', 16, ['get missing']).getUserInfo(),
-    new User('Jake Dow', 17, ['beign found', 'reading', 'tennis']).getUserInfo(),
+    User.createFromArgs('John Dow', 15, ['sleeping']),
+    User.createFromArgs('Jane Doe', 16, ['get missing']),
+    User.createFromArgs('Jake Dow', 17, ['beign found', 'reading', 'tennis']),
   ];
 
   private constructor() {}
@@ -22,14 +22,14 @@ export class DB {
     return DB.instance;
   }
 
-  addUser(user: unknown): never | void {
+  addUser(user: unknown): never | UserInfo {
     this.checkUser(user);
-    this.add(user as UserInfo);
+    return this.add(user as UserInfo);
   }
 
-  add(user: UserInfo): DB {
-    this.list.push(user);
-    return this;
+  updateUser(id: UUID, user: unknown): never | UserInfo {
+    this.checkUser(user);
+    return this.update(id, user as UserInfo | BaseUserInfo);
   }
 
   getUserList(): UserInfo[] {
@@ -38,6 +38,22 @@ export class DB {
 
   getUserById(id: UUID): UserInfo | null {
     return this.list.find(item => item.id === id) || null;
+  }
+
+  private add(userInfo: UserInfo): UserInfo {
+    const newUser = new User(userInfo).getUserInfo();
+    this.list.push(newUser);
+    return newUser;
+  }
+
+  private update(id: UUID, user: UserInfo | BaseUserInfo) {
+    const item = this.list.find(item => item.id === id);
+
+    item.username = user.username;
+    item.age = user.age;
+    item.hobbies = [...user.hobbies];
+
+    return item;
   }
 
   private checkUser(user: unknown): never | void {
