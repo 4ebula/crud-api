@@ -28,7 +28,7 @@ export default class Server {
   hadnleRequests(req: http.IncomingMessage, res: http.ServerResponse) {
     const { method, url } = req;
     if (!REG_ENDPOINT_BASE.test(url)) {
-      this.sendError(res, StatusCodes.InvalidRequest, 'Resource not found');
+      this.sendMessage(res, StatusCodes.InvalidRequest, 'Resource not found');
       return;
     }
 
@@ -45,8 +45,10 @@ export default class Server {
         this.handlePutRequest(id, req, res);
         break;
       case 'DELETE':
+        this.handleDeleteRequest(id, res);
         break;
       default:
+        this.sendMessage(res, StatusCodes.InvalidRequest, 'Resorce not found');
         break;
     }
   }
@@ -61,19 +63,19 @@ export default class Server {
     if (REG_UUID.test(id)) {
       const item = this.db.getUserById(id as UUID);
       if (!item) {
-        this.sendError(res, StatusCodes.NotFound, `Item with id ${id} not found`);
+        this.sendMessage(res, StatusCodes.NotFound, `Item with id ${id} not found`);
         return;
       }
 
       this.sendWithContent(res, item);
     } else {
-      this.sendError(res, StatusCodes.InvalidRequest, 'Invalid id');
+      this.sendMessage(res, StatusCodes.InvalidRequest, 'Invalid id');
     }
   }
 
   private handlePostRequest(req: http.IncomingMessage, res: http.ServerResponse): void {
     if (req.headers['content-type'] !== 'application/json') {
-      this.sendError(res, StatusCodes.InvalidRequest, 'Wrong type of data. Use JSON');
+      this.sendMessage(res, StatusCodes.InvalidRequest, 'Wrong type of data. Use JSON');
       return;
     }
 
@@ -86,7 +88,7 @@ export default class Server {
         const newUser = this.db.addUser(user);
         this.sendWithContent(res, newUser);
       } catch (err) {
-        this.sendError(res, StatusCodes.InvalidRequest, err.message);
+        this.sendMessage(res, StatusCodes.InvalidRequest, err.message);
       }
     });
   }
@@ -97,13 +99,13 @@ export default class Server {
     res: http.ServerResponse
   ): void {
     if (!REG_UUID.test(id)) {
-      this.sendError(res, StatusCodes.InvalidRequest, 'Invalid id');
+      this.sendMessage(res, StatusCodes.InvalidRequest, 'Invalid id');
       return;
     }
 
     const item = this.db.getUserById(id as UUID);
     if (!item) {
-      this.sendError(res, StatusCodes.NotFound, `Item with id ${id} not found`);
+      this.sendMessage(res, StatusCodes.NotFound, `Item with id ${id} not found`);
       return;
     }
 
@@ -111,25 +113,45 @@ export default class Server {
     req.on('data', chunk => (body += chunk));
 
     req.on('end', async () => {
-      const user = JSON.parse(body.toString());
       try {
+        const user = JSON.parse(body.toString());
         const updatedUser = this.db.updateUser(id as UUID, user);
         this.sendWithContent(res, updatedUser);
       } catch (err) {
-        this.sendError(res, StatusCodes.InvalidRequest, err.message);
+        this.sendMessage(res, StatusCodes.InvalidRequest, err.message);
       }
     });
   }
 
-  private sendError(res: http.ServerResponse, code: StatusCodes, message: string): void {
-    res.statusCode = code;
-    res.write(message);
-    res.end();
+  private handleDeleteRequest(id: string, res: http.ServerResponse): void {
+    if (!REG_UUID.test(id)) {
+      this.sendMessage(res, StatusCodes.InvalidRequest, 'Invalid id');
+      return;
+    }
+
+    const deletedId = this.db.deleteUser(id as UUID);
+
+    if (!deletedId) {
+      this.sendMessage(res, StatusCodes.NotFound, `Item with id ${id} not found`);
+      return;
+    }
+
+    this.sendMessage(
+      res,
+      StatusCodes.Success,
+      `User with id "${deletedId}" successfully deleted`
+    );
   }
 
-  private sendOK(res: http.ServerResponse): void {
-    res.statusCode = StatusCodes.OK;
-    res.end('OK');
+  private sendMessage(
+    res: http.ServerResponse,
+    code: StatusCodes,
+    message: string
+  ): void {
+    res.setHeader('Content-Type', 'application/json');
+    res.statusCode = code;
+    res.write(JSON.stringify({ message }));
+    res.end();
   }
 
   private async sendWithContent(

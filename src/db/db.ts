@@ -1,4 +1,4 @@
-import { UUID } from 'crypto';
+import { UUID } from 'node:crypto';
 import { BaseUserInfo, UserInfo } from '../models/user.model';
 import { User } from './user';
 import { EmptyValueError, MissingPropertyError, WrongTypeError } from '../utils';
@@ -30,6 +30,16 @@ export class DB {
   updateUser(id: UUID, user: unknown): never | UserInfo {
     this.checkUser(user);
     return this.update(id, user as UserInfo | BaseUserInfo);
+  }
+
+  deleteUser(id: UUID): UUID | null {
+    const user = this.list.find(item => item.id === id);
+    if (user) {
+      this.list = this.list.filter(item => item !== user);
+      return id;
+    } else {
+      return null;
+    }
   }
 
   getUserList(): UserInfo[] {

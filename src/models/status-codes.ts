@@ -3,4 +3,5 @@ export enum StatusCodes {
   OK = 200,
   InvalidRequest = 400,
   InternalError = 500,
+  Success = 204,
 }
